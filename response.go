@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Wrties a jsonapi response with one, with related records sideloaded, into "included" array.
+// Writes a jsonapi response with one, with related records sideloaded, into "included" array.
 // This method encodes a response for a single record only. Hence, data will be a single record rather
 // than an array of records.  If you want to serialize many records, see, MarshalManyPayload.
 //
@@ -81,7 +81,7 @@ func MarshalOnePayloadWithExtrasConfig(w io.Writer, model interface{}, extras *A
 	return nil
 }
 
-// Wrties a jsonapi response with many records, with related records sideloaded, into "included" array.
+// Writes a jsonapi response with many records, with related records sideloaded, into "included" array.
 // This method encodes a response for a slice of records, hence data will be an array of
 // records rather than a single record.  To serialize a single record, see MarshalOnePayload
 //
@@ -198,10 +198,15 @@ func visitModelNode(model interface{}, sideload bool) (*Node, []*Node, error) {
 		if len(args) >= 1 && args[0] != "" {
 			annotation := args[0]
 
-			if annotation == "primary" {
-				node.Id = fmt.Sprintf("%v", fieldValue.Interface())
+			switch annotation {
+			case "primary":
+				id := fieldValue.Interface()
+				if fieldValue.Type().String() == "bson.ObjectId" {
+					id = fieldValue.MethodByName("Hex").Call(make([]reflect.Value, 0))[0]
+				}
+				node.Id = fmt.Sprintf("%v", id)
 				node.Type = args[1]
-			} else if annotation == "attr" {
+			case "attr":
 				if node.Attributes == nil {
 					node.Attributes = make(map[string]interface{})
 				}
@@ -219,7 +224,7 @@ func visitModelNode(model interface{}, sideload bool) (*Node, []*Node, error) {
 				} else {
 					node.Attributes[args[1]] = fieldValue.Interface()
 				}
-			} else if annotation == "relation" {
+			case "relation":
 				isSlice := fieldValue.Type().Kind() == reflect.Slice
 
 				if (isSlice && fieldValue.Len() < 1) || (!isSlice && fieldValue.IsNil()) {
@@ -269,8 +274,8 @@ func visitModelNode(model interface{}, sideload bool) (*Node, []*Node, error) {
 						return false
 					}
 				}
-
-			} else if annotation != "links" {
+			case "links":
+			default:
 				er = errors.New(fmt.Sprintf("Unsupported jsonapi tag annotation, %s", annotation))
 				return false
 			}
